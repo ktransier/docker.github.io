@@ -14,12 +14,17 @@ Start by setting up the files needed to build the app. The app will run inside a
 Dockerfile consists of:
 
     FROM ruby:2.5
-    RUN apt-get update -qq && apt-get install -y nodejs postgresql-client
+
+    RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
+    RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+    RUN apt-get update -qq && apt-get install -y build-essential postgresql-client nodejs yarn
+
     RUN mkdir /myapp
     WORKDIR /myapp
     COPY Gemfile /myapp/Gemfile
     COPY Gemfile.lock /myapp/Gemfile.lock
     RUN bundle install
+    RUN yarn install --check-files
     COPY . /myapp
 
     # Add a script to be executed every time the container starts.
@@ -75,6 +80,9 @@ to link them together and expose the web app's port.
         image: postgres
         volumes:
           - ./tmp/db:/var/lib/postgresql/data
+         environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
       web:
         build: .
         command: bash -c "rm -f tmp/pids/server.pid && bundle exec rails s -p 3000 -b '0.0.0.0'"
@@ -157,7 +165,7 @@ default: &default
   encoding: unicode
   host: db
   username: postgres
-  password:
+  password: password
   pool: 5
 
 development:
@@ -191,13 +199,13 @@ db_1   | 2018-03-21 20:18:37.772 UTC [1] LOG:  database system is ready to accep
 
 Finally, you need to create the database. In another terminal, run:
 
-    docker-compose run web rake db:create
+    docker-compose run web rails db:create
 
 Here is an example of the output from that command:
 
 ```none
 vmb at snapair in ~/sandbox/rails
-$ docker-compose run web rake db:create
+$ docker-compose run web rails db:create
 Starting rails_db_1 ... done
 Created database 'myapp_development'
 Created database 'myapp_test'
